@@ -5,6 +5,7 @@
 #define lli long long int
 #define szf sizeof
 #define givemem(t, n) (t*)malloc(sizeof(t) * (n))
+#define sstr(x) scanf("%s", str);
 #define si(x) scanf("%d", &x)
 #define pi(x) printf("%d", x)
 #define sli(x) scanf("%ld", &x)
