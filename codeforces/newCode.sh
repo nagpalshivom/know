@@ -1,1 +1,1 @@
-cat template.c >> $1
+cat template >> $1
