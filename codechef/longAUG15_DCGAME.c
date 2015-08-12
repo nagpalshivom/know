@@ -202,6 +202,13 @@ li getCompCount(node * v, li k, li l, li r, li n, int comp) {
         }
     }
 }
+void freeTree(tree * root) {
+    if(root->left != NULL)
+        freeTree(root->left);
+    if(root->right != NULL)
+        freeTree(root->right);
+    free(root);
+}
 int main() {
     li n, m, * e, i, k, elemCount, * sortedIndexes, j;
     node * ind;
@@ -260,5 +267,6 @@ int main() {
     free(e);
     free(ind);
     free(sortedIndexes);
+    freeTree(root);
     return 0;
 }
