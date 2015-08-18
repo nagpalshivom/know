@@ -1,5 +1,5 @@
 class AdalineNN{
-    static double alpha = 0.5;
+    static double alpha;
     double w1, w2, b, err;
     int [][] inp;
     int [] out;
@@ -72,12 +72,12 @@ public class Adaline {
         int [][] inp = {{1, 1, -1, -1}, {1, -1, 1, -1}};
         int [] orOut = {1, 1, 1, -1};
         double w1, w2, b;
-        if(args.length != 4) {
-            System.out.println("Usage : java Adaline w1 w2 bias epoch");
+        if(args.length != 5) {
+            System.out.println("Usage : java Adaline w1 w2 bias alpha epoch");
             return;
         }
         try {
-            epochs = Integer.parseInt(args[3]);
+            epochs = Integer.parseInt(args[4]);
         }
         catch(NumberFormatException nfe) {
             System.out.println("Epoch value should be a natural number");
@@ -91,9 +91,10 @@ public class Adaline {
         w1 = Double.parseDouble(args[0]);
         w2 = Double.parseDouble(args[1]);
         b = Double.parseDouble(args[2]);
+        AdalineNN.alpha = Double.parseDouble(args[3]);
         }
         catch(NumberFormatException nfe) {
-            System.out.println("W1, W2 and Bias should be real number");
+            System.out.println("W1, W2, Bias and Alpha should be real number");
             return;
         }
         //creating a neural network for or gate
