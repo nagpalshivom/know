@@ -1,0 +1,24 @@
+void mergePart(arrType * v, rangeType l1, rangeType h1, rangeType l2, rangeType h2) {
+    rangeType size = h2 - l1 + 1, i = 0, start = l1;
+    arrType * tempV = (arrType *)malloc(sizeof(arrType) * size);
+    while(l1 <= h1 && l2 <= h2) {
+        if(v[l1] < v[l2])
+            tempV[i++] = v[l1++];
+        else
+            tempV[i++] = v[l2++];
+    }
+    while(l1 <= h1)
+        tempV[i++] = v[l1++];
+    while(l2 <= h2)
+        tempV[i++] = v[l2++];
+    memcpy(&v[start], tempV, sizeof(arrType) * size);
+    free(tempV);
+}
+void mergeSort(arrType * v, rangeType l, rangeType h){
+    if(l == h)
+        return;
+    mergeSort(v, l, (l + h) / 2);
+    mergeSort(v, (l + h) / 2 + 1, h);
+    mergePart(v, l, (l + h) / 2, (l + h) / 2 + 1, h);
+}
+
