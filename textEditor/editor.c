@@ -3,8 +3,9 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 
-int MAX_COLS, MAX_LINES;
+int MAX_COLS, MAX_LINES, FILE_NO = 0;
 
 typedef struct DynamicArray {
     char * container;
@@ -17,32 +18,122 @@ typedef struct DynamicArray {
 }vector;
 
 typedef struct TextEditor {
-    vector * data;
-    int lineNo;
+    vector * data, * head, * tail;
+    int currentLine, noOfLines, isOpen;
 }TEdit;
 
+void set_curses();
+void unset_curses();
+void handle_window_resizing();
+void openLogFile(FILE ** logFilePointer);
+
+vector * newVector(int size);
+int insertChar(char ch, vector * tempLine);
+int insertCharX(char ch, int pos, vector * tempLine);
+char removeCharX(int pos, vector * tempLine);
+char getCharX(int pos, vector * tempLine);
+void addNewLine(TEdit * tempFile);
+void addLineInBetween(vector * data);
+
+WINDOW * createMainWindow();
+WINDOW * createOptionsWindow();
+
+int main() {
+    WINDOW * mainWindow, * optionsWindow;
+    TEdit files[50];
+    int mainWindow_x, mainWindow_y, mainWindow_width, mainWindow_height;
+    char inputCharacter;
+    FILE * logFilePointer = NULL;
+    set_curses();
+    memset(files, 0, sizeof(files));
+    openLogFile(&logFilePointer);
+    signal(SIGWINCH, handle_window_resizing);
+    mainWindow = createMainWindow();
+    optionsWindow = createOptionsWindow();
+    refresh();
+    while(1) {
+        inputCharacter = getch();
+        if(inputCharacter == 27)
+            break;
+        else {
+
+        }
+    }
+    delwin(mainWindow);
+    delwin(optionsWindow);
+    printf("reached\n");
+    fclose(logFilePointer);
+    unset_curses();
+    return 0;
+}
+
+void unset_curses() {
+    keypad(stdscr, false);
+    nocbreak();
+    endwin();
+}
+
+void set_curses() {
+    initscr();
+    cbreak();
+    keypad(stdscr, true);
+    refresh();
+    getmaxyx(stdscr, MAX_LINES, MAX_COLS);
+}
+
+void handle_window_resizing(int sig) {
+    char resizeCommand[25];
+    if(COLS == MAX_COLS && LINES == MAX_LINES)
+        return;
+    sprintf(resizeCommand, "resize -s %d %d", MAX_LINES, MAX_COLS);
+    system(resizeCommand);
+    refresh();
+}
+
+void openLogFile(FILE ** logFilePointer) {
+    char * logFileCaption;
+    int fileNameSize = 200;
+    time_t rawtime;
+    struct tm * info;
+    logFileCaption = (char *)malloc(sizeof(char) * fileNameSize);
+    time(&rawtime);
+    info = localtime(&rawtime);
+    snprintf(logFileCaption, fileNameSize - 5, "%dhours %dminutes %dseconds - DATE : %d:%d:%d", info->tm_hour, info->tm_min, info->tm_sec, info->tm_mday, info->tm_mon, info->tm_year);
+    (*logFilePointer) = fopen("editor.logs", "a");;
+    fprintf(*logFilePointer, logFileCaption);
+    free(logFileCaption);
+}
+
 vector * newVector(int size) {
-    vector * tempVector = (vector *)malloc(sizeof(vector));
-    tempVector->size = size;
-    tempVector->pos = 0;
-    tempVector->container = (char *)malloc(sizeof(char) * size);
-    tempVector->prev = tempVector->next = NULL;
+    vector * tempLine = (vector *)malloc(sizeof(vector));
+    tempLine->size = size;
+    tempLine->pos = 0;
+    tempLine->container = (char *)malloc(sizeof(char) * size);
+    tempLine->prev = tempLine->next = NULL;
+    tempLine->insert = insertChar;
+    tempLine->insertX = insertCharX;
+    tempLine->removeX = removeCharX;
+    tempLine->getX = getCharX;
 }
 
 void addNewLine(TEdit * tempFile) {
     vector * temp;
-    if(tempFile->lineNo == -1) {
-        tempFile->lineNo++;
-        tempFile->data = newVector(50);
+    if(tempFile->noOfLines) {
+        tempFile->currentLine = 1;
+        tempFile->data = tempFile->head = tempFile->tail = newVector(50);
     }
     else {
         temp = tempFile->data;
         while(temp->next != NULL) {
             temp = temp->next;
+            tempFile->currentLine++;
         }
         temp->next = newVector(50);
         temp->next->prev = temp;
+        tempFile->data = temp->next;
+        tempFile->currentLine++;
     }
+    tempFile->noOfLines++;
 }
 
 void addLineInBetween(vector * data) {
@@ -55,76 +146,76 @@ void addLineInBetween(vector * data) {
     temp->prev = data;
 }
 
-int insertChar(char ch, vector * tempVector) {
-    int size = tempVector->size;
+int insertChar(char ch, vector * tempLine) {
+    int size = tempLine->size;
     if(ch == '\n') {
-        addLineInBetween(tempVector);
+        addLineInBetween(tempLine);
         //returning two specifies addition of a new line
         return 2; 
     }
-    if(tempVector->pos == size) {
-        tempVector->container = (char *)realloc(tempVector->container, sizeof(char) * size * 2);
-        tempVector->size = size * 2;
+    if(tempLine->pos == size) {
+        tempLine->container = (char *)realloc(tempLine->container, sizeof(char) * size * 2);
+        tempLine->size = size * 2;
     }
-    else if(tempVector->pos < (size / 4)) {
-        tempVector->container = (char *)realloc(tempVector->container, sizeof(char) * (size / 2));
-        tempVector->size = size / 2;
+    else if(tempLine->pos < (size / 4)) {
+        tempLine->container = (char *)realloc(tempLine->container, sizeof(char) * (size / 2));
+        tempLine->size = size / 2;
     }
-    tempVector->container[tempVector->pos++] = ch;
+    tempLine->container[tempLine->pos++] = ch;
     //element successfully added to the current line is specified by returning 1
     return 1;
 }
 
-int insertCharX(char ch, int pos, vector * tempVector) {
-    int size = tempVector->size, tempPos = tempVector->pos;
+int insertCharX(char ch, int pos, vector * tempLine) {
+    int size = tempLine->size, tempPos = tempLine->pos;
     if(pos < 0 || pos >= 32767)
         return 0;
     else if(ch != '\n') {
-        if(tempVector->pos == size) {
-            tempVector->container = (char *)realloc(tempVector->container, sizeof(char) * size * 2);
-            tempVector->size = size * 2;
+        if(tempLine->pos == size) {
+            tempLine->container = (char *)realloc(tempLine->container, sizeof(char) * size * 2);
+            tempLine->size = size * 2;
         }
-        else if(tempVector->pos < (size / 4)) {
-            tempVector->container = (char *)realloc(tempVector->container, sizeof(char) * (size / 2));
-            tempVector->size = size / 2;
+        else if(tempLine->pos < (size / 4)) {
+            tempLine->container = (char *)realloc(tempLine->container, sizeof(char) * (size / 2));
+            tempLine->size = size / 2;
         }
-        tempVector->pos += 1;
+        tempLine->pos++;
         while(tempPos != pos) {
-            tempVector->container[tempPos] = tempVector->container[tempPos - 1];
+            tempLine->container[tempPos] = tempLine->container[tempPos - 1];
             tempPos--;
         }
-        tempVector->container[tempPos] = ch;
+        tempLine->container[tempPos] = ch;
     }
     else {
-        addLineInBetween(tempVector);
-        tempVector->pos = pos;
+        addLineInBetween(tempLine);
+        tempLine->pos = pos;
         while(pos != tempPos) {
-            insertChar(tempVector->container[pos], tempVector);
+            insertChar(tempLine->container[pos], tempLine->next);
             pos++;
         }
     }
     return 1;
 }
 
-char removeCharX(int pos, vector * tempVector) {
-    int tempPos = tempVector->pos;
+char removeCharX(int pos, vector * tempLine) {
+    int tempPos = tempLine->pos;
     char ch = '\0';
     if(pos < 0 || pos >= tempPos)
         return ch;
-    ch = tempVector->container[pos];
+    ch = tempLine->container[pos];
     tempPos -= 1;
     while(tempPos != pos) {
-        tempVector->container[pos] = tempVector->container[pos + 1];
+        tempLine->container[pos] = tempLine->container[pos + 1];
         pos++;
     }
-    tempVector->pos -= 1;
+    tempLine->pos -= 1;
     return ch;
 }
 
-char getCharX(int pos, vector * tempVector) {
-    if(pos < 0 || pos >= tempVector->pos)
+char getCharX(int pos, vector * tempLine) {
+    if(pos < 0 || pos >= tempLine->pos)
         return '\0';
-    return tempVector->container[pos];
+    return tempLine->container[pos];
 }
 
 WINDOW * createMainWindow() {
@@ -139,54 +230,4 @@ WINDOW * createOptionsWindow() {
     box(tempWindow, 0, 0);
     wrefresh(tempWindow);
     return tempWindow;
-}
-
-void handle_window_resizing(int sig) {
-    char resizeCommand[25];
-    if(COLS == MAX_COLS && LINES == MAX_LINES)
-        return;
-    sprintf(resizeCommand, "resize -s %d %d", MAX_LINES, MAX_COLS);
-    system(resizeCommand);
-    refresh();
-}
-
-void openLogFile(FILE ** logFilePointer) {
-    char logFileName[200];
-    time_t rawtime;
-    struct tm * info;
-    time(&rawtime);
-    info = localtime(&rawtime);
-    sprintf(logFileName, "%d-%d-%d-logs.txt", info->tm_mday, info->tm_mon, info->tm_year);
-    *logFilePointer = fopen("editor_logs.txt", "w");
-    fprintf(*logFilePointer, "WELCOME-SLAVES");
-}
-
-int main() {
-    WINDOW * mainWindow, * optionsWindow;
-    int mainWindow_x, mainWindow_y, mainWindow_width, mainWindow_height;
-    char inputCharacter;
-    FILE * logFilePointer = NULL;
-    initscr();
-    openLogFile(&logFilePointer);
-    getmaxyx(stdscr, MAX_LINES, MAX_COLS);
-    refresh();
-    signal(SIGWINCH, handle_window_resizing);
-    cbreak();
-    keypad(stdscr, TRUE);
-    refresh();
-    mainWindow = createMainWindow();
-    optionsWindow = createOptionsWindow();
-    refresh();
-    while(1) {
-        inputCharacter = getch();
-        if(inputCharacter == 27)
-            break;
-        else {
-
-        }
-    }
-    delwin(mainWindow);
-    delwin(optionsWindow);
-    endwin();
-    return 0;
 }
