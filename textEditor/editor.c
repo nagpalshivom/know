@@ -5,22 +5,25 @@
 #include <time.h>
 #include <string.h>
 
-int MAX_COLS, MAX_LINES, FILE_NO = 0;
+int MAX_COLS, MAX_LINES, FILE_NO = 0, EDITOR_LEFT, EDITOR_RIGHT, EDITOR_TOP, EDITOR_BOTTOM, start_pos_line = 0, start_pos_char = 0, current_pos_line = 0, current_pos_char = 0;
 
 typedef struct DynamicArray {
     char * container;
     int size, pos;
     struct DynamicArray * next, * prev;
-    int (* insert)(char, struct DynamicArray *);
-    int (* insertX)(char, int, struct DynamicArray *);
-    char (* removeX)(int, struct DynamicArray *);
-    char (* getX)(int, struct DynamicArray *);
+    int (* insert)(char, struct DynamicArray *, int);
+    int (* insertX)(char, int, struct DynamicArray *, int);
+    char (* removeX)(int, struct DynamicArray *, int);
+    char (* getX)(int, struct DynamicArray *, int);
 }vector;
 
 typedef struct TextEditor {
     vector * data, * head, * tail;
     int currentLine, noOfLines, isOpen;
+    FILE * fileInStorage;
 }TEdit;
+
+TEdit files[50];
 
 void set_curses();
 void unset_curses();
@@ -28,21 +31,22 @@ void handle_window_resizing();
 void openLogFile(FILE ** logFilePointer);
 
 vector * newVector(int size);
-int insertChar(char ch, vector * tempLine);
-int insertCharX(char ch, int pos, vector * tempLine);
-char removeCharX(int pos, vector * tempLine);
-char getCharX(int pos, vector * tempLine);
-void addNewLine(TEdit * tempFile);
-void addLineInBetween(vector * data);
+int insertChar(char ch, vector * tempLine, int fileNo);
+int insertCharX(char ch, int pos, vector * tempLine, int fileNo);
+char removeCharX(int pos, vector * tempLine, int fileNo);
+char getCharX(int pos, vector * tempLine, int fileNo);
+void addNewLine(int fileNo);
+void addLineInBetween(vector * data, int fileNo);
 
 WINDOW * createMainWindow();
 WINDOW * createOptionsWindow();
 
+void refreshMainWindow(WINDOW * mainWindow, int fileNo);
+
 int main() {
     WINDOW * mainWindow, * optionsWindow;
-    TEdit files[50];
-    int mainWindow_x, mainWindow_y, mainWindow_width, mainWindow_height;
-    char inputCharacter;
+    int mainWindow_x, mainWindow_y, mainWindow_width, mainWindow_height, start_pos_line = 0, start_pos_char = 0, current_pos_line = 0, current_pos_char = 0;
+    char inputCharacter, * copyrightString = "copyright @nagpalshivom - asoc internationals pvt. lmt.";
     FILE * logFilePointer = NULL;
     set_curses();
     memset(files, 0, sizeof(files));
@@ -50,13 +54,16 @@ int main() {
     signal(SIGWINCH, handle_window_resizing);
     mainWindow = createMainWindow();
     optionsWindow = createOptionsWindow();
+    mvaddstr(LINES - 1, COLS / 2 - strlen(copyrightString) / 2, copyrightString);
     refresh();
+    refreshMainWindow(mainWindow, 1);
     while(1) {
         inputCharacter = getch();
         if(inputCharacter == 27)
             break;
-        else {
-
+        else if(inputCharacter == 127)
+            continue;
+        else if(inputCharacter == 8){
         }
     }
     delwin(mainWindow);
@@ -91,17 +98,13 @@ void handle_window_resizing(int sig) {
 }
 
 void openLogFile(FILE ** logFilePointer) {
-    char * logFileCaption;
     int fileNameSize = 200;
     time_t rawtime;
     struct tm * info;
-    logFileCaption = (char *)malloc(sizeof(char) * fileNameSize);
     time(&rawtime);
     info = localtime(&rawtime);
-    snprintf(logFileCaption, fileNameSize - 5, "%dhours %dminutes %dseconds - DATE : %d:%d:%d", info->tm_hour, info->tm_min, info->tm_sec, info->tm_mday, info->tm_mon, info->tm_year);
-    (*logFilePointer) = fopen("editor.logs", "a");;
-    fprintf(*logFilePointer, logFileCaption);
-    free(logFileCaption);
+    *logFilePointer = fopen("editor.logs", "a");
+    fprintf(*logFilePointer, "%dHours %dMinutes %dSeconds - DATE : %d:%d:%d\n", info->tm_hour, info->tm_min, info->tm_sec, info->tm_mday, info->tm_mon, info->tm_year);
 }
 
 vector * newVector(int size) {
@@ -116,27 +119,27 @@ vector * newVector(int size) {
     tempLine->getX = getCharX;
 }
 
-void addNewLine(TEdit * tempFile) {
+void addNewLine(int fileNo) {
     vector * temp;
-    if(tempFile->noOfLines) {
-        tempFile->currentLine = 1;
-        tempFile->data = tempFile->head = tempFile->tail = newVector(50);
+    if(files[fileNo].noOfLines) {
+        files[fileNo].currentLine = 1;
+        files[fileNo].data = files[fileNo].head = files[fileNo].tail = newVector(50);
     }
     else {
-        temp = tempFile->data;
+        temp = files[fileNo].data;
         while(temp->next != NULL) {
             temp = temp->next;
-            tempFile->currentLine++;
+            files[fileNo].currentLine++;
         }
         temp->next = newVector(50);
         temp->next->prev = temp;
-        tempFile->data = temp->next;
-        tempFile->currentLine++;
+        files[fileNo].data = temp->next;
+        files[fileNo].currentLine++;
     }
-    tempFile->noOfLines++;
+    files[fileNo].noOfLines++;
 }
 
-void addLineInBetween(vector * data) {
+void addLineInBetween(vector * data, int fileNo) {
     vector * temp = newVector(50);
     if(data->next != NULL) {
         temp->next = data->next;
@@ -144,12 +147,16 @@ void addLineInBetween(vector * data) {
     }
     data->next = temp;
     temp->prev = data;
+    if(temp->next == NULL)
+        files[fileNo].tail = temp;
 }
 
-int insertChar(char ch, vector * tempLine) {
+int insertChar(char ch, vector * tempLine, int fileNo) {
     int size = tempLine->size;
     if(ch == '\n') {
-        addLineInBetween(tempLine);
+        addLineInBetween(tempLine, fileNo);
+        tempLine->next->container[0] = '\n';
+        tempLine->next->pos = 1;
         //returning two specifies addition of a new line
         return 2; 
     }
@@ -166,7 +173,7 @@ int insertChar(char ch, vector * tempLine) {
     return 1;
 }
 
-int insertCharX(char ch, int pos, vector * tempLine) {
+int insertCharX(char ch, int pos, vector * tempLine, int fileNo) {
     int size = tempLine->size, tempPos = tempLine->pos;
     if(pos < 0 || pos >= 32767)
         return 0;
@@ -187,17 +194,18 @@ int insertCharX(char ch, int pos, vector * tempLine) {
         tempLine->container[tempPos] = ch;
     }
     else {
-        addLineInBetween(tempLine);
+        addLineInBetween(tempLine, fileNo);
+        insertChar(ch, tempLine->next, fileNo);
         tempLine->pos = pos;
         while(pos != tempPos) {
-            insertChar(tempLine->container[pos], tempLine->next);
+            insertChar(tempLine->container[pos], tempLine->next, fileNo);
             pos++;
         }
     }
     return 1;
 }
 
-char removeCharX(int pos, vector * tempLine) {
+char removeCharX(int pos, vector * tempLine, int fileNo) {
     int tempPos = tempLine->pos;
     char ch = '\0';
     if(pos < 0 || pos >= tempPos)
@@ -212,14 +220,17 @@ char removeCharX(int pos, vector * tempLine) {
     return ch;
 }
 
-char getCharX(int pos, vector * tempLine) {
+char getCharX(int pos, vector * tempLine, int fileNo) {
     if(pos < 0 || pos >= tempLine->pos)
         return '\0';
     return tempLine->container[pos];
 }
 
 WINDOW * createMainWindow() {
-    WINDOW * tempWindow = newwin(LINES, COLS - 25, 0, 0);
+    WINDOW * tempWindow = newwin(LINES - 1, COLS - 25, 0, 0);
+    EDITOR_LEFT = EDITOR_TOP = 1;
+    EDITOR_BOTTOM = LINES - 2;
+    EDITOR_RIGHT = COLS - 26;
     box(tempWindow, 0, 0);
     wrefresh(tempWindow);
     return tempWindow;
@@ -230,4 +241,41 @@ WINDOW * createOptionsWindow() {
     box(tempWindow, 0, 0);
     wrefresh(tempWindow);
     return tempWindow;
+}
+
+void refreshMainWindow(WINDOW * mainWindow, int fileNo) {
+    int current_row, current_col, tempPos, end, currentLine = 0;
+    char ch;
+    vector * tempLine;
+    tempLine = files[fileNo].data;
+    while(tempLine->next != NULL && currentLine != start_pos_line) {
+        currentLine++;
+        tempLine = tempLine->next;
+    }
+    tempPos = start_pos_char;
+    end = tempLine->size;
+    if(tempLine != NULL) {
+        while(current_row <= EDITOR_BOTTOM) {
+            while(current_col <= EDITOR_RIGHT) {
+                if(tempPos == end) {
+                    tempLine = tempLine->next;
+                    if(tempLine == NULL)
+                        break;
+                    else {
+                        tempPos = 0;
+                        end = tempLine->size;
+                    }
+                }
+                ch = tempLine->container[tempPos++];
+                mvaddch(current_row, current_col, ch);
+                current_col++;
+            }
+            if(tempLine == NULL)
+                break;
+            current_row++;
+        }
+    }
+    current_pos_line = currentLine;
+    current_pos_char = tempPos;
+    refresh();
 }
