@@ -94,7 +94,7 @@ public class Adaline {
         AdalineNN.alpha = Double.parseDouble(args[3]);
         }
         catch(NumberFormatException nfe) {
-            System.out.println("W1, W2, Bias and Alpha should be real number");
+            System.out.println("W1, W2, Bias and Alpha should be real numbers");
             return;
         }
         //creating a neural network for or gate
