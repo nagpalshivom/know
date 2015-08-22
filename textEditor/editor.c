@@ -18,13 +18,20 @@ typedef struct DynamicArray {
 typedef struct TextEditor {
     vector * head, * tail;
     int currentLine, noOfLines, isOpen;
-    FILE * fileInStorage;
 }TEdit;
 
 TEdit files[50];
-int MAX_COLS, MAX_LINES, EDITOR_WIDTH, EDITOR_HEIGHT, START_CHAR = 0, CURRENT_CHAR = 0, SCREEN_X = 0, SCREEN_Y = 0;
-vector * START_LINE, * CURRENT_LINE;
-
+int MAX_COLS, MAX_LINES, EDITOR_WIDTH, EDITOR_HEIGHT, START_CHAR = 0, CURRENT_CHAR = 0, SCREEN_X = 0, SCREEN_Y = 0, noOfChoices;
+vector * START_LINE, * CURRENT_LINE, * LAST_LINE;
+char * menuOptions[] = {
+    "NEW",
+    "OPEN",
+    "SAVE",
+    "SAVE AS",
+    "SEARCH",
+    "CLOSE", 
+    "EXIT"
+};
 
 void set_curses();
 void unset_curses();
@@ -49,27 +56,83 @@ void insertFileInDS(FILE * fp, int fileNo, FILE * lfp) {
     vector * tempLine = files[fileNo].head;
     while(!feof(fp)) {
         ch = fgetc(fp);
-        printf("%c", ch);
-        fprintf(lfp, "%c", ch);
         insertChar(ch, tempLine, fileNo);
         if(ch == '\n')
             tempLine = tempLine->next;
     }
 }
 
+void fillOptionsMenu(int fileNo) {
+    int i, tempW = 0;
+    noOfChoices = sizeof(menuOptions) / sizeof(char *);
+    if(has_colors() == TRUE) {
+        init_pair(2, COLOR_BLUE, COLOR_BLACK);
+        attron(COLOR_PAIR(2));
+        refresh();
+    }
+    attron(A_BOLD | A_STANDOUT);
+    for(i = 0;i < noOfChoices;i++) {
+        mvprintw(0, tempW, "%s", menuOptions[i]);
+        tempW += strlen(menuOptions[i]) + 1;
+    }
+    attroff(A_BOLD | A_STANDOUT);
+    if(has_colors() == TRUE)
+        attroff(COLOR_PAIR(2));
+    refresh();
+}
+
+void reportChoice(int x, int y, int * mouseChoice, FILE * lfp) {
+    int i, tempX = 0;
+    *mouseChoice = -1;
+    if(y == 0) {
+        for(i = 0;i < noOfChoices;i++) {
+            if(x >= tempX && x < (tempX + strlen(menuOptions[i]))) {
+                *mouseChoice = i;
+                break;
+            }
+            tempX += strlen(menuOptions[i]) + 1;
+        }
+    }
+}
+
+void writeDSToFile(int fileNo, char * fileName) {
+    vector * tempLine = files[fileNo].head;
+    int i, tempPos;
+    FILE * tempFilePtr = fopen(fileName, "w");
+    while(tempLine != NULL) {
+        tempPos = tempLine->pos;
+        for(i = 0;i < tempPos;i++)
+            fputc(tempLine->container[i],tempFilePtr);
+        tempLine = tempLine->next;
+    }
+    fclose(tempFilePtr);
+}
+
+void purgeDS(int fileNo) {
+    vector * line = files[fileNo].head, * tempLine;
+    while(line != NULL) {
+        tempLine = line;
+        line = line->next;
+        free(tempLine->container);
+        free(tempLine);
+    }
+}
+
 int main() {
-    WINDOW * mainWindow, * optionsWindow;
+    WINDOW * mainWindow;
+    MEVENT event;
     FILE * fp;
-    int mainWindow_x, mainWindow_y, mainWindow_width, mainWindow_height, START_LINE = 0, START_CHAR = 0, CURRENT_LINE = 0, CURRENT_CHAR = 0;
+    int mainWindow_x, mainWindow_y, mainWindow_width, mainWindow_height, mouseChoice, count = 0, pressed_flag = 0;
     char inputCharacter, * copyrightString = "copyright @nagpalshivom - asoc internationals pvt. lmt.";
     FILE * logFilePointer = NULL;
     set_curses();
     memset(files, 0, sizeof(files));
     openLogFile(&logFilePointer);
     signal(SIGWINCH, handle_window_resizing);
-    //mvaddstr(LINES - 1, COLS / 2 - strlen(copyrightString) / 2, copyrightString);
+    mvaddstr(LINES - 1, COLS / 2 - strlen(copyrightString) / 2, copyrightString);
+    fillOptionsMenu(0);
+    refresh();
     mainWindow = createMainWindow();
-    optionsWindow = createOptionsWindow();
     refresh();
     fp = fopen("test", "r");
     addFirstLine(0);
@@ -77,33 +140,82 @@ int main() {
     insertFileInDS(fp, 0, logFilePointer);
     fclose(fp);
     refreshMainWindow(mainWindow, 0);
+    refresh();
     while(1) {
+        count++;
         inputCharacter = getch();
-        if(inputCharacter == 27)
+        fprintf(logFilePointer, "%d : %c\n", count, inputCharacter);
+        if(inputCharacter == 27) {
             break;
-        else if(inputCharacter == 127)
-            continue;
-        else if(inputCharacter == 8){
         }
+        else if(inputCharacter == (char)KEY_UP) {
+            if(CURRENT_LINE->prev != NULL) {
+                if(CURRENT_LINE == START_LINE) {
+                    START_LINE = START_LINE->prev;
+                    START_CHAR = 0;
+                }
+                CURRENT_LINE = CURRENT_LINE->prev;
+                CURRENT_CHAR = 0;
+            }
+        }
+        else if(inputCharacter == (char)KEY_DOWN) {
+            if(CURRENT_LINE->next != NULL) {
+                if(CURRENT_LINE == LAST_LINE) {
+                    LAST_LINE = CURRENT_LINE = LAST_LINE->next;
+                    START_LINE = START_LINE->next;
+                    START_CHAR = 0;
+                }
+                CURRENT_CHAR = 0;
+            }
+        }
+        else if(inputCharacter == (char)KEY_RIGHT) {
+        }
+        else if(inputCharacter == (char)KEY_LEFT) {
+        }
+        else if(inputCharacter == (char)KEY_MOUSE) {
+            if(getmouse(&event) == OK) {
+                if(event.bstate & BUTTON1_PRESSED) {
+                    reportChoice(event.x, event.y, &mouseChoice, logFilePointer);
+                    if(mouseChoice != -1) {
+                        mvwprintw(mainWindow, 30, 50, "choice %s", menuOptions[mouseChoice]);
+                        wrefresh(mainWindow);
+                        fprintf(logFilePointer, "%s", menuOptions[mouseChoice]);
+                    }
+                }
+            }
+        }
+        else if(inputCharacter == 8){
+            //removeCharX();
+            //refreshMainWindow();
+        }
+        else if(inputCharacter >= 32 && inputCharacter <= 126) {
+            //insertChar();
+            //refreshMainWindow();
+        }
+        else
+            continue;
     }
     delwin(mainWindow);
     printf("reached\n");
-    delwin(optionsWindow);
     fclose(logFilePointer);
     unset_curses();
     return 0;
 }
 
 void unset_curses() {
-    keypad(stdscr, false);
+    keypad(stdscr, FALSE);
     nocbreak();
+    echo();
     endwin();
 }
 
 void set_curses() {
     initscr();
+    keypad(stdscr, TRUE);
+    mousemask(BUTTON1_PRESSED, NULL);
+    start_color();
     cbreak();
-    keypad(stdscr, true);
+    noecho();
     refresh();
     getmaxyx(stdscr, MAX_LINES, MAX_COLS);
 }
@@ -123,7 +235,7 @@ void openLogFile(FILE ** logFilePointer) {
     struct tm * info;
     time(&rawtime);
     info = localtime(&rawtime);
-    *logFilePointer = fopen("editor.logs", "a");
+    *logFilePointer = fopen("editor.logs", "w");
     fprintf(*logFilePointer, "%dHours %dMinutes %dSeconds - DATE : %d:%d:%d\n", info->tm_hour, info->tm_min, info->tm_sec, info->tm_mday, info->tm_mon, info->tm_year);
 }
 
@@ -242,16 +354,9 @@ char getCharX(int pos, vector * tempLine, int fileNo) {
 }
 
 WINDOW * createMainWindow() {
-    WINDOW * tempWindow = newwin(LINES - 1, COLS - 25, 0, 0);
-    EDITOR_WIDTH = COLS - 27;
-    EDITOR_HEIGHT = LINES - 2;
-    box(tempWindow, 0, 0);
-    wrefresh(tempWindow);
-    return tempWindow;
-}
-
-WINDOW * createOptionsWindow() {
-    WINDOW * tempWindow = newwin(LINES / 2, 25, 0, COLS - 25);
+    WINDOW * tempWindow = newwin(LINES - 2, COLS, 1, 0);
+    EDITOR_WIDTH = COLS - 2;
+    EDITOR_HEIGHT = LINES - 4;
     box(tempWindow, 0, 0);
     wrefresh(tempWindow);
     return tempWindow;
@@ -260,18 +365,17 @@ WINDOW * createOptionsWindow() {
 void refreshMainWindow(WINDOW * mainWindow, int fileNo) {
     int current_row = 1, current_col, tempPos, end, cursor_x, cursor_y;
     char ch;
+    vector * tempLine;
     wclear(mainWindow);
     box(mainWindow, 0, 0);
     wrefresh(mainWindow);
-    vector * tempLine;
     tempLine = START_LINE;
     tempPos = START_CHAR;
     end = tempLine->size;
-    wmove(mainWindow, 1, 1);
     if(tempLine != NULL) {
-        while(current_row < EDITOR_HEIGHT) {
+        while(current_row <= EDITOR_HEIGHT) {
             current_col = 1;
-            while(current_col < EDITOR_WIDTH) {
+            while(current_col <= EDITOR_WIDTH) {
                 if(tempPos == end) {
                     tempLine = tempLine->next;
                     if(tempLine == NULL)
@@ -296,6 +400,7 @@ void refreshMainWindow(WINDOW * mainWindow, int fileNo) {
             current_row++;
         }
     }
+    LAST_LINE = tempLine;
     wmove(mainWindow, cursor_y, cursor_x);
     wrefresh(mainWindow);
 }
