@@ -17,7 +17,7 @@ typedef struct DynamicArray {
 
 typedef struct TextEditor {
     vector * head, * tail;
-    int currentLine, noOfLines, isOpen;
+    int isOpen;
 }TEdit;
 
 TEdit files[50];
@@ -46,82 +46,19 @@ char removeCharX(int pos, vector * tempLine, int fileNo);
 char getCharX(int pos, vector * tempLine, int fileNo);
 void addFirstLine(int fileNo);
 void addLineInBetween(vector * data, int fileNo);
+void insertFileInDS(char * fileName, int fileNo, FILE * lfp);
+void writeDSToFile(int fileNo, char * fileName);
+void purgeDS(int fileNo);
 
 WINDOW * createMainWindow();
 WINDOW * createOptionsWindow();
-
-void refreshMainWindow(WINDOW * mainWindow, int fileNo);
-void insertFileInDS(FILE * fp, int fileNo, FILE * lfp) {
-    char ch;
-    vector * tempLine = files[fileNo].head;
-    while(!feof(fp)) {
-        ch = fgetc(fp);
-        insertChar(ch, tempLine, fileNo);
-        if(ch == '\n')
-            tempLine = tempLine->next;
-    }
-}
-
-void fillOptionsMenu(int fileNo) {
-    int i, tempW = 0;
-    noOfChoices = sizeof(menuOptions) / sizeof(char *);
-    if(has_colors() == TRUE) {
-        init_pair(2, COLOR_BLUE, COLOR_BLACK);
-        attron(COLOR_PAIR(2));
-        refresh();
-    }
-    attron(A_BOLD | A_STANDOUT);
-    for(i = 0;i < noOfChoices;i++) {
-        mvprintw(0, tempW, "%s", menuOptions[i]);
-        tempW += strlen(menuOptions[i]) + 1;
-    }
-    attroff(A_BOLD | A_STANDOUT);
-    if(has_colors() == TRUE)
-        attroff(COLOR_PAIR(2));
-    refresh();
-}
-
-void reportChoice(int x, int y, int * mouseChoice, FILE * lfp) {
-    int i, tempX = 0;
-    *mouseChoice = -1;
-    if(y == 0) {
-        for(i = 0;i < noOfChoices;i++) {
-            if(x >= tempX && x < (tempX + strlen(menuOptions[i]))) {
-                *mouseChoice = i;
-                break;
-            }
-            tempX += strlen(menuOptions[i]) + 1;
-        }
-    }
-}
-
-void writeDSToFile(int fileNo, char * fileName) {
-    vector * tempLine = files[fileNo].head;
-    int i, tempPos;
-    FILE * tempFilePtr = fopen(fileName, "w");
-    while(tempLine != NULL) {
-        tempPos = tempLine->pos;
-        for(i = 0;i < tempPos;i++)
-            fputc(tempLine->container[i],tempFilePtr);
-        tempLine = tempLine->next;
-    }
-    fclose(tempFilePtr);
-}
-
-void purgeDS(int fileNo) {
-    vector * line = files[fileNo].head, * tempLine;
-    while(line != NULL) {
-        tempLine = line;
-        line = line->next;
-        free(tempLine->container);
-        free(tempLine);
-    }
-}
+void refreshMainWindow(WINDOW * mainWindow, int fileNo, FILE * lfp);
+void fillOptionsMenu(int fileNo);
+void reportChoice(int x, int y, int * mouseChoice, FILE * lfp);
 
 int main() {
     WINDOW * mainWindow;
     MEVENT event;
-    FILE * fp;
     int mainWindow_x, mainWindow_y, mainWindow_width, mainWindow_height, mouseChoice, count = 0, pressed_flag = 0;
     char inputCharacter, * copyrightString = "copyright @nagpalshivom - asoc internationals pvt. lmt.";
     FILE * logFilePointer = NULL;
@@ -134,12 +71,10 @@ int main() {
     refresh();
     mainWindow = createMainWindow();
     refresh();
-    fp = fopen("test", "r");
     addFirstLine(0);
     setLineValues(0);
-    insertFileInDS(fp, 0, logFilePointer);
-    fclose(fp);
-    refreshMainWindow(mainWindow, 0);
+    insertFileInDS("test", 0, logFilePointer);
+    refreshMainWindow(mainWindow, 0, logFilePointer);
     refresh();
     while(1) {
         count++;
@@ -322,17 +257,19 @@ int insertCharX(char ch, int pos, vector * tempLine, int fileNo) {
 
 char removeCharX(int pos, vector * tempLine, int fileNo) {
     int tempPos = tempLine->pos;
+    vector * toFree;
     char ch = '\0';
     if(pos < 0 || pos >= tempPos)
         return ch;
     ch = tempLine->container[pos];
-    tempPos -= 1;
-    while(tempPos != pos) {
-        tempLine->container[pos] = tempLine->container[pos + 1];
+    if(ch == '\n') {
         pos++;
-    }
-    tempLine->pos -= 1;
-    if(tempLine->pos == 0) {
+        while(pos < tempPos) {
+            insertChar(tempLine->container[pos], tempLine->prev, fileNo);
+            pos++;
+        }
+        tempLine->pos = 0;
+        toFree = tempLine;
         if(!(tempLine->prev == NULL && tempLine->next == NULL)) {
             if(tempLine->prev != NULL)
                 tempLine->prev->next = tempLine->next;
@@ -343,6 +280,24 @@ char removeCharX(int pos, vector * tempLine, int fileNo) {
             if(tempLine->prev == NULL)
                 files[fileNo].head = tempLine->next;
         }
+        if(CURRENT_LINE == toFree) {
+            CURRENT_LINE = CURRENT_LINE->prev;
+            CURRENT_CHAR = 0;
+        }
+        if(START_LINE == toFree) {
+            START_LINE = START_LINE->prev;
+            START_CHAR = 0;
+        }
+        free(toFree->container);
+        free(toFree);
+    }
+    else {
+        tempPos -= 1;
+        while(tempPos != pos) {
+            tempLine->container[pos] = tempLine->container[pos + 1];
+            pos++;
+        }
+        tempLine->pos -= 1;
     }
     return ch;
 }
@@ -362,7 +317,7 @@ WINDOW * createMainWindow() {
     return tempWindow;
 }
 
-void refreshMainWindow(WINDOW * mainWindow, int fileNo) {
+void refreshMainWindow(WINDOW * mainWindow, int fileNo, FILE * lfp) {
     int current_row = 1, current_col, tempPos, end, cursor_x, cursor_y;
     char ch;
     vector * tempLine;
@@ -371,7 +326,7 @@ void refreshMainWindow(WINDOW * mainWindow, int fileNo) {
     wrefresh(mainWindow);
     tempLine = START_LINE;
     tempPos = START_CHAR;
-    end = tempLine->size;
+    end = tempLine->pos;
     if(tempLine != NULL) {
         while(current_row <= EDITOR_HEIGHT) {
             current_col = 1;
@@ -382,7 +337,7 @@ void refreshMainWindow(WINDOW * mainWindow, int fileNo) {
                         break;
                     else {
                         tempPos = 0;
-                        end = tempLine->size;
+                        end = tempLine->pos;
                     }
                 }
                 if(tempLine == CURRENT_LINE && tempPos == CURRENT_CHAR) {
@@ -408,4 +363,74 @@ void setLineValues(int fileNo) {
     START_LINE = files[fileNo].head;
     CURRENT_LINE = files[fileNo].head;
     START_CHAR = CURRENT_CHAR = 0;
+}
+
+void insertFileInDS(char * fileName, int fileNo, FILE * lfp) {
+    char ch;
+    FILE * tempFilePointer = fopen(fileName, "r");
+    vector * tempLine = files[fileNo].head;
+    while(!feof(tempFilePointer)) {
+        ch = fgetc(tempFilePointer);
+        insertChar(ch, tempLine, fileNo);
+        if(ch == '\n')
+            tempLine = tempLine->next;
+    }
+    fclose(tempFilePointer);
+}
+
+void fillOptionsMenu(int fileNo) {
+    int i, tempW = 0;
+    noOfChoices = sizeof(menuOptions) / sizeof(char *);
+    if(has_colors() == TRUE) {
+        init_pair(2, COLOR_BLUE, COLOR_BLACK);
+        attron(COLOR_PAIR(2));
+        refresh();
+    }
+    attron(A_BOLD | A_STANDOUT);
+    for(i = 0;i < noOfChoices;i++) {
+        mvprintw(0, tempW, "%s", menuOptions[i]);
+        tempW += strlen(menuOptions[i]) + 1;
+    }
+    attroff(A_BOLD | A_STANDOUT);
+    if(has_colors() == TRUE)
+        attroff(COLOR_PAIR(2));
+    refresh();
+}
+
+void reportChoice(int x, int y, int * mouseChoice, FILE * lfp) {
+    int i, tempX = 0;
+    *mouseChoice = -1;
+    if(y == 0) {
+        for(i = 0;i < noOfChoices;i++) {
+            if(x >= tempX && x < (tempX + strlen(menuOptions[i]))) {
+                *mouseChoice = i;
+                break;
+            }
+            tempX += strlen(menuOptions[i]) + 1;
+        }
+    }
+}
+
+void writeDSToFile(int fileNo, char * fileName) {
+    vector * tempLine = files[fileNo].head;
+    int i, tempPos;
+    FILE * tempFilePtr = fopen(fileName, "w");
+    while(tempLine != NULL) {
+        tempPos = tempLine->pos;
+        for(i = 0;i < tempPos;i++)
+            fputc(tempLine->container[i],tempFilePtr);
+        tempLine = tempLine->next;
+    }
+    fclose(tempFilePtr);
+}
+
+void purgeDS(int fileNo) {
+    vector * line = files[fileNo].head, * tempLine;
+    while(line != NULL) {
+        tempLine = line;
+        line = line->next;
+        free(tempLine->container);
+        free(tempLine);
+    }
+    files[fileNo].head = files[fileNo].tail = NULL;
 }
