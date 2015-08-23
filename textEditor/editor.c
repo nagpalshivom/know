@@ -10,8 +10,8 @@ typedef struct DynamicArray {
     int size, pos;
     struct DynamicArray * next, * prev;
     int (* insert)(char, struct DynamicArray *, int);
-    int (* insertX)(char, int, struct DynamicArray *, int);
-    char (* removeX)(int, struct DynamicArray *, int);
+    int (* insertX)(char, int);
+    char (* removeX)(int);
     char (* getX)(int, struct DynamicArray *, int);
 }vector;
 
@@ -21,8 +21,8 @@ typedef struct TextEditor {
 }TEdit;
 
 TEdit files[50];
-int MAX_COLS, MAX_LINES, EDITOR_WIDTH, EDITOR_HEIGHT, START_CHAR = 0, CURRENT_CHAR = 0, SCREEN_X = 0, SCREEN_Y = 0, noOfChoices;
-vector * START_LINE, * CURRENT_LINE, * LAST_LINE;
+int MAX_COLS, MAX_LINES, EDITOR_WIDTH, EDITOR_HEIGHT, START_CHAR, CURRENT_CHAR, SCREEN_LINE, noOfChoices;
+vector * START_LINE, * CURRENT_LINE;
 char * menuOptions[] = {
     "NEW",
     "OPEN",
@@ -41,8 +41,8 @@ void setLineValues(int fileNo);
 
 vector * newVector(int size);
 int insertChar(char ch, vector * tempLine, int fileNo);
-int insertCharX(char ch, int pos, vector * tempLine, int fileNo);
-char removeCharX(int pos, vector * tempLine, int fileNo);
+int insertCharX(char ch, int fileNo);
+char removeCharX(int fileNo);
 char getCharX(int pos, vector * tempLine, int fileNo);
 void addFirstLine(int fileNo);
 void addLineInBetween(vector * data, int fileNo);
@@ -73,39 +73,116 @@ int main() {
     refresh();
     addFirstLine(0);
     setLineValues(0);
+    fprintf(logFilePointer, "reached");
     insertFileInDS("test", 0, logFilePointer);
     refreshMainWindow(mainWindow, 0, logFilePointer);
     refresh();
     while(1) {
         count++;
         inputCharacter = getch();
-        fprintf(logFilePointer, "%d : %c\n", count, inputCharacter);
         if(inputCharacter == 27) {
             break;
         }
         else if(inputCharacter == (char)KEY_UP) {
-            if(CURRENT_LINE->prev != NULL) {
-                if(CURRENT_LINE == START_LINE) {
+            if(START_CHAR >= (COLS - 2)) {
+                START_CHAR -= (COLS - 2);
+                SCREEN_LINE++;
+            }
+            else {
+                if(START_LINE->prev != NULL) {
                     START_LINE = START_LINE->prev;
-                    START_CHAR = 0;
+                    START_CHAR = (START_CHAR / (COLS - 2)) * (COLS - 2);
+                    SCREEN_LINE++;
                 }
-                CURRENT_LINE = CURRENT_LINE->prev;
-                CURRENT_CHAR = 0;
+            }
+            if(CURRENT_CHAR >= (COLS - 2)) {
+                CURRENT_CHAR -= (COLS - 2);
+                SCREEN_LINE--;
+            }
+            else {
+                if(CURRENT_LINE->prev != NULL) {
+                    CURRENT_LINE = CURRENT_LINE->prev;
+                    CURRENT_CHAR = (CURRENT_CHAR / (COLS - 2)) * (COLS - 2);
+                    SCREEN_LINE--;
+                }
             }
         }
         else if(inputCharacter == (char)KEY_DOWN) {
-            if(CURRENT_LINE->next != NULL) {
-                if(CURRENT_LINE == LAST_LINE) {
-                    LAST_LINE = CURRENT_LINE = LAST_LINE->next;
+            if(START_CHAR + (COLS - 2) <= START_LINE->pos) {
+                START_CHAR += (COLS - 2);
+                SCREEN_LINE--;
+            }
+            else {
+                if(START_LINE->next != NULL) {
                     START_LINE = START_LINE->next;
                     START_CHAR = 0;
+                    SCREEN_LINE--;
                 }
-                CURRENT_CHAR = 0;
+            }
+            if(CURRENT_CHAR + (COLS - 2) <= CURRENT_LINE->pos) {
+                CURRENT_CHAR += (COLS - 2);
+                SCREEN_LINE++;
+            }
+            else {
+                if(CURRENT_LINE->next != NULL) {
+                    CURRENT_LINE = CURRENT_LINE->next;
+                    CURRENT_CHAR = (CURRENT_CHAR % (COLS - 2) > CURRENT_LINE->pos) ? CURRENT_LINE->pos : (CURRENT_CHAR % (COLS - 2));
+                    SCREEN_LINE++;
+                }
             }
         }
         else if(inputCharacter == (char)KEY_RIGHT) {
+            if(CURRENT_CHAR + 1 > CURRENT_LINE->pos) {
+                if(CURRENT_LINE->next != NULL) {
+                    CURRENT_LINE = CURRENT_LINE->next;
+                    CURRENT_CHAR = 0;
+                    SCREEN_LINE++;
+                }
+            }
+            else {
+                if(CURRENT_CHAR % (COLS - 2) == (COLS - 3)) {
+                    SCREEN_LINE++;
+                }
+                CURRENT_CHAR++;
+            }
+            if(SCREEN_LINE > (COLS - 2)) {
+                if(START_CHAR + (COLS - 2) <= START_LINE->pos)
+                    START_CHAR += (COLS - 2);
+                else {
+                    START_LINE = START_LINE->next;
+                    START_CHAR = 0;
+                }
+                SCREEN_LINE--;
+
+            }
         }
         else if(inputCharacter == (char)KEY_LEFT) {
+            if(CURRENT_CHAR == 0) {
+                if(CURRENT_LINE->prev != NULL) {
+                    CURRENT_LINE = CURRENT_LINE->prev;
+                    CURRENT_CHAR = CURRENT_LINE->pos;
+                    SCREEN_LINE--;
+                }
+            }
+            else if(CURRENT_CHAR % (COLS - 2) == 0) {
+                CURRENT_CHAR--;
+                CURRENT_CHAR = (CURRENT_CHAR / (COLS - 2)) * (COLS - 2);
+                SCREEN_LINE--;
+            }
+            else {
+                CURRENT_CHAR--;
+            }
+            if(SCREEN_LINE == 0) {
+                SCREEN_LINE = 1;
+                if(START_CHAR - (COLS - 2) >= 0)
+                    START_CHAR -= (COLS - 2);
+                else {
+                    if(START_LINE->prev != NULL) {
+                        START_LINE = START_LINE->prev;
+                        START_CHAR = ((START_LINE->pos) / (COLS - 2)) * (COLS - 2);
+                    }
+                }
+            }
         }
         else if(inputCharacter == (char)KEY_MOUSE) {
             if(getmouse(&event) == OK) {
@@ -120,16 +197,17 @@ int main() {
             }
         }
         else if(inputCharacter == 8){
-            //removeCharX();
-            //refreshMainWindow();
+            removeCharX(0);
+            refreshMainWindow(mainWindow, 0, logFilePointer);
         }
         else if(inputCharacter >= 32 && inputCharacter <= 126) {
-            //insertChar();
-            //refreshMainWindow();
+            insertCharX(inputCharacter, 0);
+            refreshMainWindow(mainWindow, 0, logFilePointer);
         }
         else
             continue;
     }
+    purgeDS(0);
     delwin(mainWindow);
     printf("reached\n");
     fclose(logFilePointer);
@@ -152,7 +230,6 @@ void set_curses() {
     cbreak();
     noecho();
     refresh();
-    getmaxyx(stdscr, MAX_LINES, MAX_COLS);
 }
 
 void handle_window_resizing(int sig) {
@@ -205,8 +282,6 @@ int insertChar(char ch, vector * tempLine, int fileNo) {
     int size = tempLine->size;
     if(ch == '\n') {
         addLineInBetween(tempLine, fileNo);
-        tempLine->next->container[0] = '\n';
-        tempLine->next->pos = 1;
         //returning two specifies addition of a new line
         return 2; 
     }
@@ -223,81 +298,97 @@ int insertChar(char ch, vector * tempLine, int fileNo) {
     return 1;
 }
 
-int insertCharX(char ch, int pos, vector * tempLine, int fileNo) {
-    int size = tempLine->size, tempPos = tempLine->pos;
-    if(pos < 0 || pos >= 32767)
-        return 0;
-    else if(ch != '\n') {
-        if(tempLine->pos == size) {
-            tempLine->container = (char *)realloc(tempLine->container, sizeof(char) * size * 2);
-            tempLine->size = size * 2;
+int insertCharX(char ch, int fileNo) {
+    int size = CURRENT_LINE->size, tempPos = CURRENT_LINE->pos, pos = CURRENT_CHAR, initLine = SCREEN_LINE;
+    if(ch != '\n') {
+        if(CURRENT_CHAR % (COLS - 2) == (COLS - 3))
+            SCREEN_LINE++;
+        if(CURRENT_LINE->pos == size) {
+            CURRENT_LINE->container = (char *)realloc(CURRENT_LINE->container, sizeof(char) * size * 2);
+            CURRENT_LINE->size = size * 2;
         }
-        else if(tempLine->pos < (size / 4)) {
-            tempLine->container = (char *)realloc(tempLine->container, sizeof(char) * (size / 2));
-            tempLine->size = size / 2;
+        else if(CURRENT_LINE->pos < (size / 4)) {
+            CURRENT_LINE->container = (char *)realloc(CURRENT_LINE->container, sizeof(char) * (size / 2));
+            CURRENT_LINE->size = size / 2;
         }
-        tempLine->pos++;
+        CURRENT_LINE->pos++;
         while(tempPos != pos) {
-            tempLine->container[tempPos] = tempLine->container[tempPos - 1];
+            CURRENT_LINE->container[tempPos] = CURRENT_LINE->container[tempPos - 1];
             tempPos--;
         }
-        tempLine->container[tempPos] = ch;
+        CURRENT_LINE->container[tempPos] = ch;
+        CURRENT_CHAR++;
     }
     else {
-        addLineInBetween(tempLine, fileNo);
-        insertChar(ch, tempLine->next, fileNo);
-        tempLine->pos = pos;
+        addLineInBetween(CURRENT_LINE, fileNo);        
+        CURRENT_LINE->pos = pos;
         while(pos != tempPos) {
-            insertChar(tempLine->container[pos], tempLine->next, fileNo);
+            insertChar(CURRENT_LINE->container[pos], CURRENT_LINE->next, fileNo);
             pos++;
         }
+        CURRENT_LINE = CURRENT_LINE->next;
+        CURRENT_CHAR = 0;
+        SCREEN_LINE++;
+    }
+    if(initLine != SCREEN_LINE && SCREEN_LINE > (COLS - 2)) {
+        if(START_CHAR + (COLS - 2) <= START_LINE->pos)
+            START_CHAR += (COLS - 2);
+        else {
+            START_LINE = START_LINE->next;
+            START_CHAR = 0;
+        }
+        SCREEN_LINE--;
     }
     return 1;
 }
 
-char removeCharX(int pos, vector * tempLine, int fileNo) {
-    int tempPos = tempLine->pos;
-    vector * toFree;
+char removeCharX(int fileNo) {
+    int tempPos = CURRENT_LINE->pos, tPos;
+    vector * toFree = CURRENT_LINE;
     char ch = '\0';
-    if(pos < 0 || pos >= tempPos)
-        return ch;
-    ch = tempLine->container[pos];
-    if(ch == '\n') {
-        pos++;
-        while(pos < tempPos) {
-            insertChar(tempLine->container[pos], tempLine->prev, fileNo);
-            pos++;
+    if(CURRENT_CHAR == 0) {
+        if(CURRENT_LINE->prev == NULL) {
+            return ch;
         }
-        tempLine->pos = 0;
-        toFree = tempLine;
-        if(!(tempLine->prev == NULL && tempLine->next == NULL)) {
-            if(tempLine->prev != NULL)
-                tempLine->prev->next = tempLine->next;
-            if(tempLine->next != NULL)
-                tempLine->next->prev = tempLine->prev;
-            if(tempLine->next == NULL)
-                files[fileNo].tail = tempLine->prev;
-            if(tempLine->prev == NULL)
-                files[fileNo].head = tempLine->next;
-        }
-        if(CURRENT_LINE == toFree) {
+        else {
+            ch = '\n';
+            if(SCREEN_LINE == 1) {
+                START_LINE = START_LINE->prev;
+                START_CHAR = (START_LINE->pos / (COLS - 2) ) * (COLS - 2);
+            }
+            else
+                SCREEN_LINE--;
             CURRENT_LINE = CURRENT_LINE->prev;
-            CURRENT_CHAR = 0;
+            CURRENT_CHAR = CURRENT_LINE->pos;
+            for(tPos = 0;tPos < tempPos;tPos++)
+                insertChar(toFree->container[tPos], CURRENT_LINE, fileNo);
+            if(toFree->next == NULL)
+                files[fileNo].tail = toFree->prev;
+            free(toFree->container);
+            free(toFree);
         }
-        if(START_LINE == toFree) {
-            START_LINE = START_LINE->prev;
-            START_CHAR = 0;
+    }
+    else if(CURRENT_CHAR % (COLS - 2) == 0) {
+        ch = CURRENT_LINE->container[CURRENT_CHAR - 1];
+        if(SCREEN_LINE == 1) {
+            START_CHAR--;
+            START_CHAR = (START_LINE->pos / (COLS - 2) ) * (COLS - 2);
         }
-        free(toFree->container);
-        free(toFree);
+        else
+            SCREEN_LINE--;
+        CURRENT_CHAR--;
+        tempPos--;
+        for(tPos = CURRENT_CHAR;tPos < tempPos;tPos++)
+            CURRENT_LINE->container[tPos] = CURRENT_LINE->container[tPos + 1];
+        CURRENT_LINE->pos = tPos;
     }
     else {
-        tempPos -= 1;
-        while(tempPos != pos) {
-            tempLine->container[pos] = tempLine->container[pos + 1];
-            pos++;
-        }
-        tempLine->pos -= 1;
+        ch = CURRENT_LINE->container[CURRENT_CHAR - 1];
+        CURRENT_CHAR--;
+        tempPos--;
+        for(tPos = CURRENT_CHAR;tPos < tempPos;tPos++)
+            CURRENT_LINE->container[tPos] = CURRENT_LINE->container[tPos + 1];
+        CURRENT_LINE->pos = tPos;
     }
     return ch;
 }
@@ -318,7 +409,7 @@ WINDOW * createMainWindow() {
 }
 
 void refreshMainWindow(WINDOW * mainWindow, int fileNo, FILE * lfp) {
-    int current_row = 1, current_col, tempPos, end, cursor_x, cursor_y;
+    int current_row = 1, current_col, tempPos, end;
     char ch;
     vector * tempLine;
     wclear(mainWindow);
@@ -336,33 +427,27 @@ void refreshMainWindow(WINDOW * mainWindow, int fileNo, FILE * lfp) {
                     if(tempLine == NULL)
                         break;
                     else {
+                        current_row++;
                         tempPos = 0;
                         end = tempLine->pos;
                     }
                 }
-                if(tempLine == CURRENT_LINE && tempPos == CURRENT_CHAR) {
-                    cursor_x = current_col;
-                    cursor_y = current_row;
-                }
                 ch = tempLine->container[tempPos++];
-                if(ch == '\n')
-                    break;
                 mvwaddch(mainWindow, current_row, current_col, ch);
                 current_col++;
             }
             if(tempLine == NULL)
                 break;
-            current_row++;
         }
     }
-    LAST_LINE = tempLine;
-    wmove(mainWindow, cursor_y, cursor_x);
+    wmove(mainWindow, SCREEN_LINE, CURRENT_CHAR % (COLS - 2) + 1);
     wrefresh(mainWindow);
 }
 void setLineValues(int fileNo) {
     START_LINE = files[fileNo].head;
     CURRENT_LINE = files[fileNo].head;
     START_CHAR = CURRENT_CHAR = 0;
+    SCREEN_LINE = 1;
 }
 
 void insertFileInDS(char * fileName, int fileNo, FILE * lfp) {
