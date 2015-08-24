@@ -68,9 +68,7 @@ int main() {
     signal(SIGWINCH, handle_window_resizing);
     mvaddstr(LINES - 1, COLS / 2 - strlen(copyrightString) / 2, copyrightString);
     fillOptionsMenu(0);
-    refresh();
     mainWindow = createMainWindow();
-    refresh();
     addFirstLine(0);
     setLineValues(0);
     fprintf(logFilePointer, "reached");
@@ -427,9 +425,9 @@ void refreshMainWindow(WINDOW * mainWindow, int fileNo, FILE * lfp) {
                     if(tempLine == NULL)
                         break;
                     else {
-                        current_row++;
                         tempPos = 0;
                         end = tempLine->pos;
+                        break;
                     }
                 }
                 ch = tempLine->container[tempPos++];
@@ -438,10 +436,12 @@ void refreshMainWindow(WINDOW * mainWindow, int fileNo, FILE * lfp) {
             }
             if(tempLine == NULL)
                 break;
+            current_row++;
         }
     }
     wmove(mainWindow, SCREEN_LINE, CURRENT_CHAR % (COLS - 2) + 1);
     wrefresh(mainWindow);
+    refresh();
 }
 void setLineValues(int fileNo) {
     START_LINE = files[fileNo].head;
@@ -464,7 +464,7 @@ void insertFileInDS(char * fileName, int fileNo, FILE * lfp) {
 }
 
 void fillOptionsMenu(int fileNo) {
-    int i, tempW = 0;
+    int i, tempW = 1;
     noOfChoices = sizeof(menuOptions) / sizeof(char *);
     if(has_colors() == TRUE) {
         init_pair(2, COLOR_BLUE, COLOR_BLACK);
@@ -472,14 +472,18 @@ void fillOptionsMenu(int fileNo) {
         refresh();
     }
     attron(A_BOLD | A_STANDOUT);
+    refresh();
     for(i = 0;i < noOfChoices;i++) {
         mvprintw(0, tempW, "%s", menuOptions[i]);
         tempW += strlen(menuOptions[i]) + 1;
     }
-    attroff(A_BOLD | A_STANDOUT);
-    if(has_colors() == TRUE)
-        attroff(COLOR_PAIR(2));
     refresh();
+    attroff(A_BOLD | A_STANDOUT);
+    refresh();
+    if(has_colors() == TRUE) {
+        attroff(COLOR_PAIR(2));
+        refresh();
+    }
 }
 
 void reportChoice(int x, int y, int * mouseChoice, FILE * lfp) {
