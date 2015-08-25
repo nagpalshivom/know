@@ -17,6 +17,7 @@ typedef struct DynamicArray {
 
 typedef struct TextEditor {
     vector * head, * tail;
+    char fileName[200];
     int isOpen;
 }TEdit;
 
@@ -27,11 +28,11 @@ char * menuOptions[] = {
     "NEW",
     "OPEN",
     "SAVE",
-    "SAVE AS",
     "SEARCH",
     "CLOSE", 
     "EXIT"
 };
+int enabled[6];
 
 void set_curses();
 void unset_curses();
@@ -46,8 +47,9 @@ char removeCharX(int fileNo);
 char getCharX(int pos, vector * tempLine, int fileNo);
 void addFirstLine(int fileNo);
 void addLineInBetween(vector * data, int fileNo);
-void insertFileInDS(char * fileName, int fileNo, FILE * lfp);
-void writeDSToFile(int fileNo, char * fileName);
+void insertFileInDS(int fileNo, FILE * lfp);
+void writeDSToFile(int fileNo);
+void getFileName(int fileNo, WINDOW * mainWindow, FILE * lfp);
 void purgeDS(int fileNo);
 
 WINDOW * createMainWindow();
@@ -57,11 +59,11 @@ void fillOptionsMenu(int fileNo);
 void reportChoice(int x, int y, int * mouseChoice, FILE * lfp);
 
 int main() {
-    WINDOW * mainWindow;
+    WINDOW * mainWindow, * inpWindow;
     MEVENT event;
-    int mainWindow_x, mainWindow_y, mainWindow_width, mainWindow_height, mouseChoice, count = 0, pressed_flag = 0;
+    int mainWindow_x, mainWindow_y, mainWindow_width, mainWindow_height, mouseChoice, count = 0, pressed_flag = 0, fileOpenFlag = 0, i;
     char inputCharacter, * copyrightString = "copyright @nagpalshivom - asoc internationals pvt. lmt.";
-    FILE * logFilePointer = NULL;
+    FILE * logFilePointer = NULL, * tempFilePointer = NULL;
     set_curses();
     memset(files, 0, sizeof(files));
     openLogFile(&logFilePointer);
@@ -69,19 +71,13 @@ int main() {
     mvaddstr(LINES - 1, COLS / 2 - strlen(copyrightString) / 2, copyrightString);
     fillOptionsMenu(0);
     mainWindow = createMainWindow();
-    addFirstLine(0);
-    setLineValues(0);
-    fprintf(logFilePointer, "reached");
-    insertFileInDS("test", 0, logFilePointer);
-    refreshMainWindow(mainWindow, 0, logFilePointer);
-    refresh();
     while(1) {
         count++;
         inputCharacter = getch();
         if(inputCharacter == 27) {
             break;
         }
-        else if(inputCharacter == (char)KEY_UP) {
+        else if((inputCharacter == (char)KEY_UP) && fileOpenFlag) {
             if(CURRENT_CHAR >= (COLS - 2)) {
                 CURRENT_CHAR -= (COLS - 2);
                 SCREEN_LINE--;
@@ -108,7 +104,7 @@ int main() {
             }
             refreshMainWindow(mainWindow, 0, logFilePointer);
         }
-        else if(inputCharacter == (char)KEY_DOWN) {
+        else if((inputCharacter == (char)KEY_DOWN) && fileOpenFlag) {
             if(CURRENT_CHAR + (COLS - 2) <= CURRENT_LINE->pos) {
                 CURRENT_CHAR += (COLS - 2);
                 SCREEN_LINE++;
@@ -135,7 +131,7 @@ int main() {
             }
             refreshMainWindow(mainWindow, 0, logFilePointer);
         }
-        else if(inputCharacter == (char)KEY_RIGHT) {
+        else if((inputCharacter == (char)KEY_RIGHT) && fileOpenFlag) {
             if(CURRENT_CHAR + 1 > CURRENT_LINE->pos) {
                 if(CURRENT_LINE->next != NULL) {
                     CURRENT_LINE = CURRENT_LINE->next;
@@ -161,7 +157,7 @@ int main() {
             }
             refreshMainWindow(mainWindow, 0, logFilePointer);
         }
-        else if(inputCharacter == (char)KEY_LEFT) {
+        else if((inputCharacter == (char)KEY_LEFT) && fileOpenFlag) {
             if(CURRENT_CHAR == 0) {
                 if(CURRENT_LINE->prev != NULL) {
                     CURRENT_LINE = CURRENT_LINE->prev;
@@ -195,28 +191,81 @@ int main() {
                 if(event.bstate & BUTTON1_PRESSED) {
                     reportChoice(event.x, event.y, &mouseChoice, logFilePointer);
                     if(mouseChoice != -1) {
-                        mvwprintw(mainWindow, 30, 50, "choice %s", menuOptions[mouseChoice]);
-                        wrefresh(mainWindow);
+                        if(mouseChoice == 0) {
+                            addFirstLine(0);
+                            setLineValues(0);
+                            getFileName(0, mainWindow, logFilePointer);
+                            tempFilePointer = fopen(files[0].fileName, "w");
+                            fclose(tempFilePointer);
+                            insertFileInDS(0, logFilePointer);
+                            fileOpenFlag = 1;
+                            for(i = 0;i < 6;i++)
+                                enabled[i] = 1 - enabled[i];
+                            fillOptionsMenu(0);
+                        }
+                        else if(mouseChoice == 1) {
+                            addFirstLine(0);
+                            setLineValues(0);
+                            getFileName(0, mainWindow, logFilePointer);
+                            insertFileInDS(0, logFilePointer);
+                            fileOpenFlag = 1;
+                            for(i = 0;i < 6;i++)
+                                enabled[i] = 1 - enabled[i];
+                            fillOptionsMenu(0);
+                        }
+                        else if(mouseChoice == 2) {
+                            writeDSToFile(0);
+                        }
+                        else if(mouseChoice == 3) {
+                        }
+                        else if(mouseChoice == 4) {
+                            fileOpenFlag = 0;
+                            purgeDS(0);
+                            for(i = 0;i < 6;i++)
+                                enabled[i] = 1 - enabled[i];
+                            fillOptionsMenu(0);
+                            wclear(mainWindow);
+                            refresh();
+                        }
+                        else if(mouseChoice == 5) {
+                            return 0;
+                        }
                         fprintf(logFilePointer, "%s", menuOptions[mouseChoice]);
                     }
                 }
             }
-            refreshMainWindow(mainWindow, 0, logFilePointer);
+            if(fileOpenFlag)
+                refreshMainWindow(mainWindow, 0, logFilePointer);
+            else {
+                wclear(mainWindow);
+                box(mainWindow, 0, 0);
+                wrefresh(mainWindow);
+                refresh();
+            }
         }
         else if(inputCharacter == (char)KEY_BACKSPACE) {
-            removeCharX(0);
-            refreshMainWindow(mainWindow, 0, logFilePointer);
+            if(fileOpenFlag) {
+                removeCharX(0);
+                refreshMainWindow(mainWindow, 0, logFilePointer);
+            }
+            else {
+            }
         }
-        else if(inputCharacter == (char)KEY_ENTER) {
-            insertCharX('\n', 0);
-            refreshMainWindow(mainWindow, 0, logFilePointer);
+        else if(inputCharacter == (char)KEY_ENTER || inputCharacter == (char)10) {
+            if(fileOpenFlag) {
+                insertCharX('\n', 0);
+                refreshMainWindow(mainWindow, 0, logFilePointer);
+            }
+            else {
+            }
         }
         else if(inputCharacter >= 32 && inputCharacter <= 126) {
-            if(inputCharacter == '\n') {
-                fprintf(logFilePointer, "enter pressed : %d\n", (int)inputCharacter);
+            if(fileOpenFlag) {
+                insertCharX(inputCharacter, 0);
+                refreshMainWindow(mainWindow, 0, logFilePointer);
             }
-            insertCharX(inputCharacter, 0);
-            refreshMainWindow(mainWindow, 0, logFilePointer);
+            else {
+            }
         }
         else
             continue;
@@ -244,6 +293,8 @@ void set_curses() {
     cbreak();
     noecho();
     refresh();
+    memset(enabled, 0, sizeof(enabled));
+    enabled[0] = enabled[1] = enabled[5] = 1;
 }
 
 void handle_window_resizing(int sig) {
@@ -467,7 +518,8 @@ void setLineValues(int fileNo) {
     SCREEN_LINE = 1;
 }
 
-void insertFileInDS(char * fileName, int fileNo, FILE * lfp) {
+void insertFileInDS(int fileNo, FILE * lfp) {
+    char * fileName = files[fileNo].fileName;
     char ch;
     FILE * tempFilePointer = fopen(fileName, "r");
     vector * tempLine = files[fileNo].head;
@@ -483,6 +535,7 @@ void insertFileInDS(char * fileName, int fileNo, FILE * lfp) {
 void fillOptionsMenu(int fileNo) {
     int i, tempW = 1;
     noOfChoices = sizeof(menuOptions) / sizeof(char *);
+    init_pair(3, COLOR_BLACK, COLOR_BLACK);
     if(has_colors() == TRUE) {
         init_pair(2, COLOR_BLUE, COLOR_BLACK);
         attron(COLOR_PAIR(2));
@@ -491,8 +544,16 @@ void fillOptionsMenu(int fileNo) {
     attron(A_BOLD | A_STANDOUT);
     refresh();
     for(i = 0;i < noOfChoices;i++) {
+        if(!enabled[i]) {
+            attroff(COLOR_PAIR(2));
+            attron(COLOR_PAIR(3));
+        }
         mvprintw(0, tempW, "%s", menuOptions[i]);
         tempW += strlen(menuOptions[i]) + 1;
+        if(!enabled[i]) {
+            attroff(COLOR_PAIR(3));
+            attron(COLOR_PAIR(2));
+        }
     }
     refresh();
     attroff(A_BOLD | A_STANDOUT);
@@ -509,7 +570,8 @@ void reportChoice(int x, int y, int * mouseChoice, FILE * lfp) {
     if(y == 0) {
         for(i = 0;i < noOfChoices;i++) {
             if(x >= tempX && x < (tempX + strlen(menuOptions[i]))) {
-                *mouseChoice = i;
+                if(enabled[i])
+                    *mouseChoice = i;
                 break;
             }
             tempX += strlen(menuOptions[i]) + 1;
@@ -517,7 +579,8 @@ void reportChoice(int x, int y, int * mouseChoice, FILE * lfp) {
     }
 }
 
-void writeDSToFile(int fileNo, char * fileName) {
+void writeDSToFile(int fileNo) {
+    char * fileName = files[fileNo].fileName;
     vector * tempLine = files[fileNo].head;
     int i, tempPos;
     FILE * tempFilePtr = fopen(fileName, "w");
@@ -526,6 +589,8 @@ void writeDSToFile(int fileNo, char * fileName) {
         for(i = 0;i < tempPos;i++)
             fputc(tempLine->container[i],tempFilePtr);
         tempLine = tempLine->next;
+        if(tempLine != NULL)
+            fputc('\n', tempFilePtr);
     }
     fclose(tempFilePtr);
 }
@@ -539,4 +604,17 @@ void purgeDS(int fileNo) {
         free(tempLine);
     }
     files[fileNo].head = files[fileNo].tail = NULL;
+}
+
+void getFileName(int fileNo, WINDOW * mainWindow, FILE * lfp) {
+    char inputCharacter, * copyrightString = "copyright @nagpalshivom - asoc internationals pvt. lmt.";
+    int k = 0;
+    delwin(mainWindow);
+    unset_curses();
+    printf("ENTER FILE NAME : ");
+    scanf("%s", files[fileNo].fileName);
+    set_curses();
+    fillOptionsMenu(fileNo);
+    mvaddstr(LINES - 1, COLS / 2 - strlen(copyrightString) / 2, copyrightString);
+    mainWindow = createMainWindow();
 }
