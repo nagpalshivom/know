@@ -82,17 +82,6 @@ int main() {
             break;
         }
         else if(inputCharacter == (char)KEY_UP) {
-            if(START_CHAR >= (COLS - 2)) {
-                START_CHAR -= (COLS - 2);
-                SCREEN_LINE++;
-            }
-            else {
-                if(START_LINE->prev != NULL) {
-                    START_LINE = START_LINE->prev;
-                    START_CHAR = (START_CHAR / (COLS - 2)) * (COLS - 2);
-                    SCREEN_LINE++;
-                }
-            }
             if(CURRENT_CHAR >= (COLS - 2)) {
                 CURRENT_CHAR -= (COLS - 2);
                 SCREEN_LINE--;
@@ -104,19 +93,22 @@ int main() {
                     SCREEN_LINE--;
                 }
             }
-        }
-        else if(inputCharacter == (char)KEY_DOWN) {
-            if(START_CHAR + (COLS - 2) <= START_LINE->pos) {
-                START_CHAR += (COLS - 2);
-                SCREEN_LINE--;
-            }
-            else {
-                if(START_LINE->next != NULL) {
-                    START_LINE = START_LINE->next;
-                    START_CHAR = 0;
-                    SCREEN_LINE--;
+            if(SCREEN_LINE < 1) {
+                if(START_CHAR >= (COLS - 2)) {
+                    START_CHAR -= (COLS - 2);
+                    SCREEN_LINE++;
+                }
+                else {
+                    if(START_LINE->prev != NULL) {
+                        START_LINE = START_LINE->prev;
+                        START_CHAR = (START_CHAR / (COLS - 2)) * (COLS - 2);
+                        SCREEN_LINE++;
+                    }
                 }
             }
+            refreshMainWindow(mainWindow, 0, logFilePointer);
+        }
+        else if(inputCharacter == (char)KEY_DOWN) {
             if(CURRENT_CHAR + (COLS - 2) <= CURRENT_LINE->pos) {
                 CURRENT_CHAR += (COLS - 2);
                 SCREEN_LINE++;
@@ -128,6 +120,20 @@ int main() {
                     SCREEN_LINE++;
                 }
             }
+            if(SCREEN_LINE > EDITOR_HEIGHT) {
+                if(START_CHAR + (COLS - 2) <= START_LINE->pos) {
+                    START_CHAR += (COLS - 2);
+                    SCREEN_LINE--;
+                }
+                else {
+                    if(START_LINE->next != NULL) {
+                        START_LINE = START_LINE->next;
+                        START_CHAR = 0;
+                        SCREEN_LINE--;
+                    }
+                }
+            }
+            refreshMainWindow(mainWindow, 0, logFilePointer);
         }
         else if(inputCharacter == (char)KEY_RIGHT) {
             if(CURRENT_CHAR + 1 > CURRENT_LINE->pos) {
@@ -153,6 +159,7 @@ int main() {
                 SCREEN_LINE--;
 
             }
+            refreshMainWindow(mainWindow, 0, logFilePointer);
         }
         else if(inputCharacter == (char)KEY_LEFT) {
             if(CURRENT_CHAR == 0) {
@@ -181,6 +188,7 @@ int main() {
                     }
                 }
             }
+            refreshMainWindow(mainWindow, 0, logFilePointer);
         }
         else if(inputCharacter == (char)KEY_MOUSE) {
             if(getmouse(&event) == OK) {
@@ -193,12 +201,20 @@ int main() {
                     }
                 }
             }
+            refreshMainWindow(mainWindow, 0, logFilePointer);
         }
-        else if(inputCharacter == 8){
+        else if(inputCharacter == (char)KEY_BACKSPACE) {
             removeCharX(0);
             refreshMainWindow(mainWindow, 0, logFilePointer);
         }
+        else if(inputCharacter == (char)KEY_ENTER) {
+            insertCharX('\n', 0);
+            refreshMainWindow(mainWindow, 0, logFilePointer);
+        }
         else if(inputCharacter >= 32 && inputCharacter <= 126) {
+            if(inputCharacter == '\n') {
+                fprintf(logFilePointer, "enter pressed : %d\n", (int)inputCharacter);
+            }
             insertCharX(inputCharacter, 0);
             refreshMainWindow(mainWindow, 0, logFilePointer);
         }
@@ -439,8 +455,9 @@ void refreshMainWindow(WINDOW * mainWindow, int fileNo, FILE * lfp) {
             current_row++;
         }
     }
-    wmove(mainWindow, SCREEN_LINE, CURRENT_CHAR % (COLS - 2) + 1);
     wrefresh(mainWindow);
+    move(SCREEN_LINE + 1, CURRENT_CHAR % (COLS - 2) + 1);
+    fprintf(lfp, "cursor at %d : %d\n", SCREEN_LINE + 1, CURRENT_CHAR % (COLS - 2) + 1); 
     refresh();
 }
 void setLineValues(int fileNo) {
