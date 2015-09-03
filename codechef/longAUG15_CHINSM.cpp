@@ -1,4 +1,12 @@
 //due to weak test cases O(n^2) solution gives me 90/100 points
+
+//for O(sqrt(max(elements)) * no of elements) we have to find largest i < j for element at index j
+//such that elem(i) % elem(j) = K
+
+//we traverse and for every element we calculate the number of divisors
+//and update indexes for all the divisors to the current element
+//we keep a separate index value for elements that have value = K
+//then we find the max of value of K and the divisor index (if it exists)
 #include <iostream>
 #include <algorithm>
 #include <vector>
