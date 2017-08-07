@@ -13,6 +13,7 @@
 #define pc putchar_unlocked
 #define fl(i, val, n) for(i = (val);i < (n);i++)
 #define fln(i, val, n) for(i = (val);i > (n);i--)
+#define MOD 1000000007
 
 void writeInt(long long int n) {
 	long long int N = n, rev, count = 0;
@@ -103,6 +104,63 @@ void fri(int * x) {
 		*x = -(*x);
 }
 
+lli fact[100003], factM[100003];
+
+lli calcInv(long long int y) {
+    lli mod, val = 1;
+    mod = MOD - 2;
+    while(mod > 0) {
+        if(mod % 2 == 1)
+            val = (val * y) % MOD;
+        y = (y * y) % MOD;
+        mod /= 2;
+    }
+    return val;
+}
+
+lli calcNCR(lli n, lli r) {
+	return (factM[n - r] * fact[n - r]) % MOD;
+}
+
+void preFact() {
+	lli i;
+	fact[0] = 1;
+	for(i = 1;i < 100003;i++)
+		fact[i] = (i * fact[i - 1]) % MOD;
+	for(i = 1;i < 100003;i++)
+		fact[i] = calcInv(fact[i]);
+}
+
+void preFactM(lli m, lli x) {
+	lli i;
+	factM[0] = 1;
+	for(i = 1;i <= x;i++)
+		factM[i] = (((i + m) % MOD) * factM[i - 1]) % MOD;
+}
+
 int main() {
+    int t;
+    lli m, * a, ans, n, x, i;
+    si(t);
+    preFact();
+    while(t--) {
+        ans = 0;
+        slli(n);
+        slli(x);
+        slli(m);
+        a = givemem(lli, n);
+        fl(i, 0, n) {
+            slli(a[i]);
+            a[i] = a[i] % MOD;
+        }
+        m--;
+        x--;
+        preFactM(m, x);
+        for(i = 0;i <= x;i++)
+            ans = (ans + (calcNCR(m + i, m) * a[x - i]) % MOD) % MOD;
+        pi(ans);
+        pc('\n');
+        free(a);
+    }
     return 0;
 }

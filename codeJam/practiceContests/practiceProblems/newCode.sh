@@ -1,0 +1,1 @@
+cat template >> $1

@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <malloc.h>
+#include <math.h>
+#include <stdlib.h>
 #define li long int
 #define lli long long int
 #define setZ(x) memset(x, 0, sizeof(x))
@@ -13,8 +15,7 @@
 #define pc putchar_unlocked
 #define fl(i, val, n) for(i = (val);i < (n);i++)
 #define fln(i, val, n) for(i = (val);i > (n);i--)
-
-void writeInt(long long int n) {
+inline void writeInt(long long int n) {
 	long long int N = n, rev, count = 0;
 	rev = N;
 	if (N == 0) {
@@ -38,8 +39,7 @@ void writeInt(long long int n) {
 		pc('0');
 	}
 }
-
-void frs(char * str) {
+inline void frs(char * str) {
 	register char c = 0;
 	register int i = 0;
 	while (c < 33)
@@ -51,8 +51,7 @@ void frs(char * str) {
 	}
 	str[i] = '\0';
 }
-
-void fril(long int * x) {
+inline void fril(long int * x) {
 	register int c = gc();
 	*x = 0;
 	int neg = 0;
@@ -68,8 +67,7 @@ void fril(long int * x) {
 	if(neg)
 		*x = -(*x);
 }
-
-void frill(long long int * x) {
+inline void frill(long long int * x) {
 	register int c = gc();
 	*x = 0;
 	int neg = 0;
@@ -85,8 +83,8 @@ void frill(long long int * x) {
 	if(neg)
 		*x = -(*x);
 }
-
-void fri(int * x) {
+inline void fri(int * x) 
+{
 	register int c = gc();
 	*x = 0;
 	int neg = 0;
@@ -102,7 +100,51 @@ void fri(int * x) {
 	if(neg)
 		*x = -(*x);
 }
-
+void mergePart(long int * v, long int l1, long int h1, long int l2, long int h2) {
+    long int size = h2 - l1 + 1, i = 0, start = l1;
+    long int * tempV = (long int *)malloc(sizeof(long int) * size);
+    while(l1 <= h1 && l2 <= h2) {
+        if(v[l1] < v[l2])
+            tempV[i++] = v[l1++];
+        else
+            tempV[i++] = v[l2++];
+    }
+    while(l1 <= h1)
+        tempV[i++] = v[l1++];
+    while(l2 <= h2)
+        tempV[i++] = v[l2++];
+    memcpy(&v[start], tempV, sizeof(long int) * size);
+    free(tempV);
+}
+void mergeSort(long int * v, long int l, long int h){
+    if(l == h)
+        return;
+    mergeSort(v, l, (l + h) / 2);
+    mergeSort(v, (l + h) / 2 + 1, h);
+    mergePart(v, l, (l + h) / 2, (l + h) / 2 + 1, h);
+}
 int main() {
+	long int n, * g, i, q, k, v;
+	long long int * preSum;
+	scanf("%ld", &n);
+	g = givemem(li, n);
+	preSum = givemem(lli, n);
+	for(i = 0;i < n;i++)
+		scanf("%ld", &g[i]);
+	mergeSort(g, 0, n - 1);
+	preSum[0] = g[0];
+	for(i = 1;i < n;i++)
+		preSum[i] = g[i] + preSum[i - 1];
+	scanf("%ld", &q);
+	for(i = 0;i < q;i++) {
+		scanf("%ld", &k);
+		if(k)
+			v = (int)ceil((double)n / (double)(k + 1));
+		else
+			v = n;
+		printf("%lld\n", preSum[v - 1]);
+	}
+	free(g);
+	free(preSum);
     return 0;
 }
