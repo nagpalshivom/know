@@ -1,3 +1,6 @@
+import java.util.*;
+import java.io.*;
+
 class round316Div2_D {
     public static void main(String[] args) {
         MyScanner sc = new MyScanner();
@@ -10,17 +13,17 @@ class round316Div2_D {
         List<Node> levelEndMarkers = new ArrayList(n);
 
 
-        nodes[0] = new Node(0);
-        levelEndMarkers[0] = nodes[0];
+        nodes.set(0, new Node(0));
+        levelEndMarkers.set(0, nodes.get(0));
         for(int i = 1;i < n; n++) {
-
-            Node nodep = nodes[p - 1];
-            nodes[i] = new Node(i);
-            Node nodei = nodes[i];
+            int p = sc.nextInt();
+            Node nodep = nodes.get(p - 1);
+            nodes.set(i, new Node(i));
+            Node nodei = nodes.get(i);
 
             nodep.children.add(nodei);
             nodei.height = nodep.height + 1;
-            Node heightPredecessor = levelEndMarkers[nodei.height];
+            Node heightPredecessor = levelEndMarkers.get(nodei.height);
             if(heightPredecessor != null) {
                 heightPredecessor.next = nodei;
             }
@@ -29,10 +32,10 @@ class round316Div2_D {
 
         String chars = sc.nextLine();
         for(int i = 0;i < n;i++) {
-            nodes[i].c = chars.charAt(i);
+            nodes.get(i).c = chars.charAt(i);
         }
 
-        populateMaxHeight(nodes[0]);
+        populateMaxHeight(nodes.get(0));
         populateLetterCoundTillNow(levelEndMarkers);
         for(int i = 0;i < m;i++) {
             int v = sc.nextInt();
@@ -43,26 +46,26 @@ class round316Div2_D {
         out.close();
     }
 
-    void populateLetterCoundTillNow(Node root) {
-        if(root == null) {
-            return;
-        } 
-        for(Node levelEndMarker : levelEndMarkers) {
-            int letterCountTillNow = 0;
-            while(levelEndMarker != null) {
-                int bitToSet = (int)levelEndMarker.c - (int)'a';
-                letterCountTillNow = letterCountTillNow | 1 << bitToSet;
-                levelEndMarker.letterCountTillNow = letterCountTillNow;
+    static void populateLetterCoundTillNow(List<Node> levelEndMarkers) {
+        if(root != null) {
+            for(Node levelEndMarker : levelEndMarkers) {
+                int letterCountTillNow = 0;
+                while(levelEndMarker != null) {
+                    int bitToSet = (int)levelEndMarker.c - (int)'a';
+                    letterCountTillNow = letterCountTillNow | 1 << bitToSet;
+                    levelEndMarker.letterCountTillNow = letterCountTillNow;
+                }
             }
         }
     }
 
-    public int populateMaxHeight(Node root) {
+    static int populateMaxHeight(Node root) {
+        //root == null will never occur (hopefully)
         if(root == null) {
-            return 0;
+            return -1;
         } else {
             for(Node child : root.children) {
-                int prospectiveMaxHeight = getMaxHeight(child) + 1;
+                int prospectiveMaxHeight = populateMaxHeight(child) + 1;
                 if(root.maxheight < prospectiveMaxHeight) {
                     root.maxheight = prospectiveMaxHeight;
                 }
@@ -71,7 +74,7 @@ class round316Div2_D {
         }
     }
 
-    public class Node { 
+    public static class Node { 
         Node next;
         char c;
         int v;
