@@ -9,8 +9,8 @@ class round316Div2_D {
         int n, m;
         n = sc.nextInt();
         m = sc.nextInt();
-        List<Node> nodes = new ArrayList(n);
-        List<Node> levelEndMarkers = new ArrayList(n);
+        List<Node> nodes = new ArrayList<Node>(n);
+        List<Node> levelEndMarkers = new ArrayList<Node>(n);
 
 
         nodes.set(0, new Node(0));
@@ -25,7 +25,7 @@ class round316Div2_D {
             nodei.height = nodep.height + 1;
             Node heightPredecessor = levelEndMarkers.get(nodei.height);
             if(heightPredecessor != null) {
-                heightPredecessor.next = nodei;
+                nodei.prev = heightPredecessor;
             }
             heightPredecessor = nodei;
         }
@@ -40,21 +40,76 @@ class round316Div2_D {
         for(int i = 0;i < m;i++) {
             int v = sc.nextInt();
             int h = sc.nextInt();
-            out.write(isPalindrome());
+            Node nodev = nodes.get(v - 1);
+            int l = findLeftmostEdgeVertexAtHeight(nodev, h);
+            int r = findRightmostEdgeVertexAtHeight(nodev, h);
+            int bitForL = nodes.get(l).letterCountTillNow;
+            int bitForR = nodes.get(r).letterCountTillNow;
+            int charAtR = nodes.get(r).c - 'a';
+            int odd = 0;
+            for(int j = 0;j < 26 && odd < 2;j++) {
+                if(((bitForL & (1 << j)) & ((bitForR | (1 << charAtR)) & (1 << j))) > 0) {
+                    odd++;
+                }
+            }
+            String ans = "Yes";
+            if(odd > 1) {
+                ans = "No";
+            }
+            out.write(ans);
         }
 
         out.close();
     }
 
-    static void populateLetterCoundTillNow(List<Node> levelEndMarkers) {
-        if(root != null) {
-            for(Node levelEndMarker : levelEndMarkers) {
-                int letterCountTillNow = 0;
-                while(levelEndMarker != null) {
-                    int bitToSet = (int)levelEndMarker.c - (int)'a';
-                    letterCountTillNow = letterCountTillNow | 1 << bitToSet;
-                    levelEndMarker.letterCountTillNow = letterCountTillNow;
+    static int findLeftmostEdgeVertexAtHeight(Node root, int height) {
+        if(root == null || root.height > height) {
+            return -1;
+        } else {
+            if(root.height == height) {
+                return root.v;
+            } else {
+                int answerFromChild = -1;
+                for(Node child : root.children) {
+                    answerFromChild = findLeftmostEdgeVertexAtHeight(child, height);
+                    if(answerFromChild != -1) {
+                        return answerFromChild;
+                    }
                 }
+                return answerFromChild;
+            }
+        }
+    }
+
+    static int findRightmostEdgeVertexAtHeight(Node root, int height) {
+        if(root == null || root.height > height) {
+            return -1;
+        } else {
+            if(root.height == height) {
+                return root.v;
+            } else {
+                int answerFromChild = -1;
+                Iterator<Node> descIterator = root.children.descendingIterator();
+                while(descIterator.hasNext()) {
+                    Node child = descIterator.next();
+                    answerFromChild = findRightmostEdgeVertexAtHeight(child, height);
+                    if(answerFromChild != -1) {
+                        return answerFromChild;
+                    }
+                }
+                return answerFromChild;
+            }
+        }
+    }
+
+    static void populateLetterCoundTillNow(List<Node> levelEndMarkers) {
+        for(Node levelEndMarker : levelEndMarkers) {
+            int letterCountTillNow = 0;
+            while(levelEndMarker != null) {
+                int bitToSet = levelEndMarker.c - 'a';
+                letterCountTillNow = letterCountTillNow | 1 << bitToSet;
+                levelEndMarker.letterCountTillNow = letterCountTillNow;
+                levelEndMarker = levelEndMarker.prev;
             }
         }
     }
@@ -75,7 +130,7 @@ class round316Div2_D {
     }
 
     public static class Node { 
-        Node next;
+        Node prev;
         char c;
         int v;
         int maxheight;
@@ -90,7 +145,6 @@ class round316Div2_D {
 
     public static PrintWriter out;
       
-   //-----------MyScanner class for faster input----------
    public static class MyScanner {
       BufferedReader br;
       StringTokenizer st;
