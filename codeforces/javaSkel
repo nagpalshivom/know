@@ -1,0 +1,62 @@
+import java.util.*;
+import java.io.*;
+
+public class R316D2_E {
+
+    public static PrintWriter outWriter;
+    public static MyScanner sc;
+
+    public static void main(String[] args) {
+        sc = new MyScanner();
+        outWriter = new PrintWriter(new BufferedOutputStream(System.out));
+
+    }
+    
+
+
+    public static class MyScanner {
+        BufferedReader br;
+        StringTokenizer st;
+
+        public MyScanner() {
+            br = new BufferedReader(new InputStreamReader(System.in));
+            outWriter = new PrintWriter(new BufferedOutputStream(System.out));
+        }
+
+        String next() {
+            while (st == null || !st.hasMoreElements()) {
+                try {
+                    st = new StringTokenizer(br.readLine());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            return st.nextToken();
+        }
+
+        int nextInt() {
+            return Integer.parseInt(next());
+        }
+
+        long nextLong() {
+            return Long.parseLong(next());
+        }
+
+        double nextDouble() {
+            return Double.parseDouble(next());
+        }
+
+        String nextLine(){
+            String str = "";
+            try {
+                str = br.readLine();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            return str;
+        }
+
+    }
+
+
+}
